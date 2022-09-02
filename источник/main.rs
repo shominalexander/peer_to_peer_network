@@ -1,12 +1,11 @@
-
 use libp2p::{ core::upgrade
-            , floodsub::{ Floodsub, FloodsubEvent, Topic                 }
+            , floodsub::{ Floodsub, FloodsubEvent, Topic                             }
             , futures::StreamExt
             , identity
-            , mdns::{ Mdns, MdnsEvent                                    }
+            , mdns::{ Mdns, MdnsEvent                                                }
             , mplex
-            , noise::{ Keypair, NoiseConfig, X25519Spec                  }
-            , swarm::{ NetworkBehaviourEventProcess, Swarm, SwarmBuilder }
+            , noise::{ Keypair, NoiseConfig, X25519Spec                              }
+            , swarm::{ NetworkBehaviourEventProcess, Swarm, SwarmBuilder, SwarmEvent }
             , tcp::TokioTcpConfig
             , NetworkBehaviour
             , PeerId
@@ -15,7 +14,7 @@ use libp2p::{ core::upgrade
 
 use once_cell::sync::Lazy                    ;
 use serde::{ Deserialize,Serialize          };
-use std::{   env,thread,time                };
+use std::env                                 ;
 use tokio::{ io::AsyncBufReadExt,sync::mpsc };
 
 static CONSOLE : Lazy<Vec<String>>       = Lazy::new(|| env::args().collect()                );
@@ -48,26 +47,18 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for Behaviour {
  fn inject_event(&mut self, event: FloodsubEvent) {
   match event {
    FloodsubEvent::Message(message) => {
+    println!("message.source: {:?}", message.source);
+
     if let Ok(request) = serde_json::from_slice::<Request>(&message.data) {
-     println!("request: {:?}", request);
+     println!("request:        {:?}", request);
 
      if request.peer.trim().is_empty() || request.peer == PEER.to_string() {
-      let source = message.source.to_string();
+      send(self.response_sender.clone(), message.source.to_string());
 
-      send(self.response_sender.clone(), source.clone());
-
-      println!("Sender:    PEER.to_string(): {:?}", PEER.to_string()); 
-      println!("Recipient: source.clone():   {:?}", source.clone()  ); 
      } //if request.peer.trim().is_empty() || request.peer == PEER.to_string() {
 
     } else if let Ok(response) = serde_json::from_slice::<Response>(&message.data) {
-     println!("response:         {:?}", response        ); 
-     println!("PEER.to_string(): {:?}", PEER.to_string()); 
-
-     if response.receiver == PEER.to_string() {
-      println!("response.word: {}", response.word);
-
-     } //if response.receiver == PEER.to_string() {
+     println!("response:       {:?}", response); 
 
     } //} else if let Ok(req) = serde_json::from_slice::<Request>(&msg.data) {
    } //FloodsubEvent::Message(message) => {
@@ -104,8 +95,10 @@ async fn main() {
 
  Swarm::listen_on(&mut swarm, "/ip4/0.0.0.0/tcp/0".parse().expect("can get a local socket")).expect("swarm can be started");
 
+ println!("PEER.to_string(): {:?}", PEER.to_string()); 
+
  loop {
-  let evt = { tokio::select! { event    = swarm.select_next_some() => None
+  let evt = { tokio::select! { event    = swarm.select_next_some() => { match event { SwarmEvent::NewListenAddr{..} => { println!("SwarmEvent: {:?}", event); } _ => () } None }
                              , line     = stdin.next_line()        => Some(EventType::Input(line.expect("can get line").expect("can read line from stdin")))
                              , response = response_rcv.recv()      => Some(EventType::Response(response.expect("response exists")))
                              } 
@@ -117,9 +110,8 @@ async fn main() {
 
      let command: &str = line.as_str();
 
-     match command { "exit"   => break
-                   , "others" => swarm.behaviour_mut().floodsub.publish(TOPIC.clone(), serde_json::to_string(&Request { peer: "".to_string() }).expect("can jsonify request").as_bytes())
-                   , _        => println!("Command {} is unknown", command)
+     match command { "exit" => break
+                   , _      => swarm.behaviour_mut().floodsub.publish(TOPIC.clone(), serde_json::to_string(&Request { peer: command.to_string() }).expect("can jsonify request").as_bytes())
                    } 
     } //EventType::Input(line) => {
 
@@ -130,6 +122,13 @@ async fn main() {
 
      swarm.behaviour_mut().floodsub.publish(TOPIC.clone(), json.as_bytes()); 
     } //EventType::Response(response) => { 
+
+    
+//    SwarmEvent::ConnectionClosed      => { None; }
+//    SwarmEvent::ConnectionEstablished => { None; }
+//    SwarmEvent::Dialing               => { None; }
+//    SwarmEvent::IncomingConnection    => { None; }
+//    SwarmEvent::NewListenAddr         => { None; }
    } //match event { 
   } //if let Some(event) = evt {
  } //loop {

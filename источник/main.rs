@@ -112,24 +112,17 @@ async fn main() {
 
      match command { "exit" => break
                    , _      => swarm.behaviour_mut().floodsub.publish(TOPIC.clone(), serde_json::to_string(&Request { peer: command.to_string() }).expect("can jsonify request").as_bytes())
-                   } 
+                   }
     } //EventType::Input(line) => {
 
-    EventType::Response(response) => { 
+    EventType::Response(response) => {
      println!("EventType::Response(response): {:?}", response);
 
      let json = serde_json::to_string(&response).expect("can jsonify response");
 
-     swarm.behaviour_mut().floodsub.publish(TOPIC.clone(), json.as_bytes()); 
-    } //EventType::Response(response) => { 
-
-    
-//    SwarmEvent::ConnectionClosed      => { None; }
-//    SwarmEvent::ConnectionEstablished => { None; }
-//    SwarmEvent::Dialing               => { None; }
-//    SwarmEvent::IncomingConnection    => { None; }
-//    SwarmEvent::NewListenAddr         => { None; }
-   } //match event { 
+     swarm.behaviour_mut().floodsub.publish(TOPIC.clone(), json.as_bytes());
+    } //EventType::Response(response) => {
+   } //match event {
   } //if let Some(event) = evt {
  } //loop {
 } //async fn main() {

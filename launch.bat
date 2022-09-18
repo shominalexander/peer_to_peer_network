@@ -1,7 +1,5 @@
 echo on
 
-cd "C:\Rust\peer_to_peer"
-
 cargo build
 
 pause

@@ -12,14 +12,15 @@ use libp2p::{ core::upgrade
             , Transport
 }; //use libp2p::{ core::upgrade
 
-use serde::{ Deserialize,Serialize          };
-use std::env                                 ;
-use tokio::{ io::AsyncBufReadExt,sync::mpsc };
+use once_cell::sync::Lazy                     ;
+use serde::{ Deserialize, Serialize          };
+use std::{ env, thread, time                 };
+use tokio::{ io::AsyncBufReadExt, sync::mpsc };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Request { destination: String } 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Response { receiver: String
                 , text    : String
                 }
@@ -33,24 +34,26 @@ struct Behaviour {                      floodsub       : Floodsub
 enum EventType { Input(String)
                , Response(Response)
                }
+pub static DELAY: Lazy<u64> = Lazy::new(|| 2);
+
 impl NetworkBehaviourEventProcess<FloodsubEvent> for Behaviour {
  fn inject_event(&mut self, event: FloodsubEvent) {
   match event {
    FloodsubEvent::Message(message) => {
-    println!("message.source: {:?}", message.source);
+    println!("message.source: {:?}", message.source); thread::sleep(time::Duration::from_secs(*DELAY));
 
     if let Ok(request) = serde_json::from_slice::<Request>(&message.data) {
-     println!("request:        {:?}", request);
+     println!("request:        {:?}", request); thread::sleep(time::Duration::from_secs(*DELAY));
 
      if request.destination.trim().is_empty() || request.destination == self.peer.to_string() {
       if let Err(e) = self.response_sender.clone().send( Response { receiver: message.source.to_string(), text: self.text.to_string() } ) { 
-       println!("{:?}", e);
+       println!("{:?}", e); thread::sleep(time::Duration::from_secs(*DELAY));
 
       } //if let Err(e) = self.response_sender.clone().send( Response { receiver: message.source.to_string(), text: self.text.to_string() } ) { 
      } //if request.destination.trim().is_empty() || request.destination == self.peer.to_string() {
 
     } else if let Ok(response) = serde_json::from_slice::<Response>(&message.data) {
-     println!("response:       {:?}", response); 
+     println!("response:       {:?}", response); thread::sleep(time::Duration::from_secs(*DELAY));
 
     } //} else if let Ok(req) = serde_json::from_slice::<Request>(&msg.data) {
    } //FloodsubEvent::Message(message) => {
@@ -97,10 +100,10 @@ async fn main() {
 
  Swarm::listen_on(&mut swarm, "/ip4/0.0.0.0/tcp/0".parse().expect("can get a local socket")).expect("swarm can be started");
 
- println!("peer.to_string(): {:?}", peer.to_string()); 
+ println!("peer.to_string(): {:?}", peer.to_string()); thread::sleep(time::Duration::from_secs(*DELAY));
 
  loop {
-  let evt = { tokio::select! { event    = swarm.select_next_some() => { match event { SwarmEvent::NewListenAddr{..} => { println!("SwarmEvent: {:?}", event); } _ => () } None }
+  let evt = { tokio::select! { event    = swarm.select_next_some() => { match event { SwarmEvent::NewListenAddr{..} => { println!("SwarmEvent: {:?}", event); thread::sleep(time::Duration::from_secs(*DELAY)); } _ => () } None }
                              , line     = stdin.next_line()        => Some(EventType::Input(line.expect("can get line").expect("can read line from stdin")))
                              , response = response_rcv.recv()      => Some(EventType::Response(response.expect("response exists")))
                              } 
@@ -108,7 +111,7 @@ async fn main() {
   if let Some(event) = evt {
    match event { 
     EventType::Input(line) => {
-     println!("EventType::Input(line): {:?}", line);
+     println!("EventType::Input(line): {:?}", line); thread::sleep(time::Duration::from_secs(*DELAY));
 
      let command: &str = line.as_str();
 
@@ -118,7 +121,7 @@ async fn main() {
     } //EventType::Input(line) => {
 
     EventType::Response(response) => {
-     println!("EventType::Response(response): {:?}", response);
+     println!("EventType::Response(response): {:?}", response); thread::sleep(time::Duration::from_secs(*DELAY));
 
      let json = serde_json::to_string(&response).expect("can jsonify response");
 

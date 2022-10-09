@@ -113,11 +113,13 @@ async fn main() {
     EventType::Input(line) => {
      println!("EventType::Input(line): {:?}", line); thread::sleep(time::Duration::from_secs(*DELAY));
 
-     let command: &str = line.as_str();
+     if &line[..] == "exit" {
+      break;
 
-     match command { "exit" => break
-                   , _      => swarm.behaviour_mut().floodsub.publish(topic.clone(), serde_json::to_string(&Request { destination: command.to_string() }).expect("can jsonify request").as_bytes())
-                   }
+     } else { //if &line[..] == "exit" {
+      swarm.behaviour_mut().floodsub.publish(topic.clone(), serde_json::to_string(&Request { destination: line }).expect("can jsonify request").as_bytes())
+
+     } //} else { //if &line[..] == "exit" {
     } //EventType::Input(line) => {
 
     EventType::Response(response) => {
